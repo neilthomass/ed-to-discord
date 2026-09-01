@@ -1,81 +1,60 @@
 # EdToDiscord
 
-**EdToDiscord** is a serverless Cloudflare Worker that checks Ed Discussion every five minutes and sends new public announcements and staff-authored threads to Discord webhooks.
 
-There is no server, Docker container, or always-running process to maintain. A Cloudflare Cron Trigger runs the Worker, and Workers KV stores one SHA-256 last-seen cursor per Ed course.
 
-## What it sends
+I built EdToDiscord because I hated the notification experience in Ed. I would get a bunch of emails every day, but each email only showed the course title and no useful preview of the post. I still had to open Ed just to find out whether an announcement mattered.
 
-- Public Ed threads whose type is `announcement`
-- Public threads authored by an Ed user with the `staff` or `admin` course role
-- One Discord embed per matching thread, in oldest-to-newest order
-- Multiple courses, each routed to its own Discord webhook (or several courses routed to the same webhook)
+EdToDiscord checks Ed every five minutes and sends useful announcements to Discord instead. The Discord message includes the course, category, author, post title, content preview, and a link to the original thread.
 
-Private threads are never sent. The first poll only records the newest existing thread in each course; it does not flood Discord with historical posts. Delivery is at-least-once: an extremely narrow failure between Discord accepting a message and KV saving its cursor can cause a duplicate on the next run.
+It runs as a Cloudflare Worker, so there is no server or Docker container to keep running.
 
-## Before you begin
+## What gets posted
 
-You need:
+EdToDiscord sends:
 
-1. A [Cloudflare account](https://dash.cloudflare.com/sign-up) with Workers enabled.
-2. [Node.js](https://nodejs.org/) 20 or newer (which includes npm).
-3. An Ed account that can view every course you want to monitor.
-4. Permission to create a webhook in each destination Discord channel.
+- Public announcements
+- Public posts and questions written by users with the `staff` or `admin` course role
 
-## 1. Create the Discord webhook
+It never sends private threads. Student posts are ignored unless the thread is an announcement.
 
-For each destination channel:
+The first run saves the newest thread in each selected course without posting anything. After that, new matching threads are sent in order. A SHA-256 cursor for each course is stored in Workers KV so the same posts are not sent every five minutes.
 
-1. Open Discord and choose **Edit Channel → Integrations → Webhooks**.
-2. Choose **New Webhook**, give it a name, and select the channel.
-3. Choose **Copy Webhook URL** and keep the URL private. Anyone with it can post to that channel.
+## Create a Discord webhook
 
-Discord's [webhook introduction](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) has screenshots if the menu is unfamiliar.
+1. Open the Discord channel settings
+2. Go to **Integrations → Webhooks**
+3. Create a webhook and copy its URL
 
-## 2. Create an Ed API token and find course IDs
+Keep the URL private. Anyone with it can post to that channel
 
-1. Sign in to Ed and open [Settings → API Tokens](https://edstem.org/us/settings/api-tokens).
-2. Create and copy a token. Treat it like a password.
-3. Open each course in Ed. Its numeric course ID is in the address, for example `12345` in:
+## Create an Ed API token
 
-   ```text
-   https://edstem.org/us/courses/12345/discussion
-   ```
+1. Open [Ed API Token Settings](https://edstem.org/us/settings/api-tokens)
+2. Create a token and copy it
+3. Keep it private, just like the Discord webhook URL
 
-For manual deployment, the course-to-webhook setting is a single-line JSON object:
+## Deploy
 
-```json
-{"12345":"https://discord.com/api/webhooks/AAA/BBB","67890":"https://discord.com/api/webhooks/CCC/DDD"}
-```
-
-## 3. Clone and deploy
+Clone the repository and run the setup script:
 
 ```sh
+git clone https://github.com/neilthomass/ed-to-discord.git
+cd ed-to-discord
 ./setup.sh
 ```
 
-If your checkout does not preserve executable permissions, run `chmod +x setup.sh` once.
+The script will:
 
-The setup script will:
+1. Ask for your Ed token and Discord webhook if they are not already in `.env`.
+2. Load the courses available to your Ed account.
+3. Show a checkbox-style list of courses.
+4. Let you toggle courses by entering numbers such as `1,3`.
+5. Use Enter to confirm your selection.
+6. Run the tests.
+7. Sign in to Cloudflare if needed.
+8. Create the KV namespace and deploy the Worker.
 
-1. Install the local Wrangler CLI.
-2. Validate the Ed token and load its available courses.
-3. Show a checkbox-style course list; toggle courses by number and press Enter to confirm.
-4. Use the saved or prompted Discord webhook for every selected course.
-5. Run the test suite.
-6. Open Cloudflare authentication if needed.
-7. Create a Workers KV namespace and add its ID to `wrangler.jsonc`.
-8. Upload both secrets and deploy the Worker with its five-minute schedule.
-
-## Test the Discord webhook
-
-Send one test embed to the webhook saved in `.env` or `.dev.vars`:
-
-```sh
-./test-ping
-```
-
-Mentions are disabled in the test payload. Validate the configuration without sending anything with `./test-ping --dry-run`, or provide a custom message with `./test-ping "Deployment is ready"`.
+The Worker runs every five minutes after deployment. The first scheduled run only initializes its cursors, so it will not dump old posts into Discord.
 
 ## Acknowledgements
 
