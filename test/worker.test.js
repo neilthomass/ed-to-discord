@@ -66,7 +66,7 @@ test("first course poll seeds KV without posting historical threads", async () =
   assert.equal(JSON.parse(writes[0][1]).threadNumber, 12);
 });
 
-test("new matching threads post oldest first and advance the cursor", async () => {
+test("multiple staff announcements between polls post oldest first", async () => {
   const posts = [];
   const writes = [];
   const oldHash = await threadHash(10, 1);
@@ -84,8 +84,8 @@ test("new matching threads post oldest first and advance the cursor", async () =
   };
   const fetcher = async (url, options = {}) => {
     if (url.includes("/api/courses/10/threads")) return jsonResponse({ threads: summaries });
-    if (url.includes("/api/threads/2")) return detailResponse(2, "announcement", "student");
-    if (url.includes("/api/threads/3")) return detailResponse(3, "post", "staff");
+    if (url.includes("/api/threads/2")) return detailResponse(2, "announcement", "staff", "2026-01-01T00:00:00Z");
+    if (url.includes("/api/threads/3")) return detailResponse(3, "announcement", "staff", "2026-01-01T00:03:00Z");
     if (options.method === "POST") {
       posts.push(JSON.parse(options.body).embeds[0].title);
       return new Response(null, { status: 204 });
@@ -177,7 +177,7 @@ function jsonResponse(value) {
   });
 }
 
-function detailResponse(id, type, courseRole) {
+function detailResponse(id, type, courseRole, createdAt = "2026-01-01T00:00:00Z") {
   return jsonResponse({
     thread: {
       id,
@@ -188,7 +188,7 @@ function detailResponse(id, type, courseRole) {
       document: "Body",
       category: "General",
       type,
-      created_at: "2026-01-01T00:00:00Z",
+      created_at: createdAt,
       is_private: false,
       is_anonymous: false,
     },
