@@ -1,12 +1,14 @@
 # EdToDiscord
 
-
-
 I built EdToDiscord because I hated the notification experience in Ed. I would get a bunch of emails every day, but each email only showed the course title and no useful preview of the post. I still had to open Ed just to find out whether an announcement mattered.
 
 EdToDiscord checks Ed every five minutes and sends useful announcements to Discord instead. The Discord message includes the course, category, author, post title, content preview, and a link to the original thread.
 
 It runs as a Cloudflare Worker, so there is no server or Docker container to keep running.
+
+![EdToDiscord desktop notification](docs/desktop-notification.png)
+
+![EdToDiscord message in Discord](docs/discord-message.png)
 
 ## What gets posted
 

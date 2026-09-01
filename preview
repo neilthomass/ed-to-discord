@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Missing node. Install Node.js 20 or newer, then try again." >&2
+  exit 1
+fi
+
+node <<'NODE'
+const fs = require("fs");
+
+function readEnvFile(path) {
+  if (!fs.existsSync(path)) return {};
+  const values = {};
+  for (const rawLine of fs.readFileSync(path, "utf8").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const separator = line.indexOf("=");
+    if (separator < 1) continue;
+    const key = line.slice(0, separator).trim();
+    let value = line.slice(separator + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    values[key] = value;
+  }
+  return values;
+}
+
+const values = { ...readEnvFile(".dev.vars"), ...readEnvFile(".env") };
+let webhook = values.DISCORD_WEBHOOK_URL;
+
+if (!webhook && values.DISCORD_WEBHOOKS) {
+  try {
+    webhook = Object.values(JSON.parse(values.DISCORD_WEBHOOKS))[0];
+  } catch {
+    console.error("DISCORD_WEBHOOKS is not valid JSON.");
+    process.exit(1);
+  }
+}
+
+if (!webhook) {
+  console.error("No webhook found. Add DISCORD_WEBHOOK_URL to .env or DISCORD_WEBHOOKS to .dev.vars.");
+  process.exit(1);
+}
+
+let parsed;
+try {
+  parsed = new URL(webhook);
+} catch {
+  console.error("The configured Discord webhook is not a valid URL.");
+  process.exit(1);
+}
+
+if (parsed.protocol !== "https:" || !["discord.com", "discordapp.com"].includes(parsed.hostname)) {
+  console.error("The configured webhook must be an HTTPS Discord webhook URL.");
+  process.exit(1);
+}
+
+const payload = {
+  username: "Ed",
+  avatar_url: "https://edstem.org/favicon.ico",
+  allowed_mentions: { parse: [] },
+  embeds: [{
+    author: {
+      name: "EECS 126 • Announcements",
+      url: "https://edstem.org/us",
+    },
+    title: "#314 Surprise quiz tomorrow",
+    url: "https://edstem.org/us",
+    description: "Hi everyone — we'll have a short surprise quiz at the beginning of lecture tomorrow. It will cover conditional probability and Bayes' rule. See you in class!",
+    color: 0xfffb55,
+    footer: {
+      text: "Course Staff (Staff)",
+    },
+    timestamp: new Date().toISOString(),
+  }],
+};
+
+fetch(webhook, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+}).then(async (response) => {
+  if (!response.ok) {
+    throw new Error(`Discord returned ${response.status}: ${await response.text()}`);
+  }
+  console.log("Preview notification sent successfully.");
+}).catch((error) => {
+  console.error(`Preview failed: ${error.message}`);
+  process.exitCode = 1;
+});
+NODE
