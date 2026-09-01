@@ -8,6 +8,8 @@ It runs as a Cloudflare Worker, so there is no server or Docker container to kee
 
 For a normal personal setup, it is free to run. Polling every five minutes is only 288 Worker runs per day, well below Cloudflare's [Workers free limit](https://developers.cloudflare.com/workers/platform/limits/), and the small cursor cache fits within the [Workers KV free limits](https://developers.cloudflare.com/kv/platform/limits/).
 
+## Preview
+
 <img src="docs/desktop-notification.webp" alt="EdToDiscord desktop notification" width="720">
 
 <img src="docs/discord-message.webp" alt="EdToDiscord message in Discord" width="620">
