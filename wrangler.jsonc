@@ -1,0 +1,20 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "ed-to-discord",
+	"main": "src/worker.js",
+	"compatibility_date": "2026-09-01",
+	"workers_dev": true,
+	"triggers": {
+		"crons": [
+			"*/5 * * * *"
+		]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "LAST_SEEN"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}

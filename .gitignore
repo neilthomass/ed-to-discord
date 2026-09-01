@@ -1,0 +1,11 @@
+# Local secrets
+.env
+.dev.vars
+
+# Dependencies and Cloudflare local state
+node_modules/
+.wrangler/
+
+# Logs and operating-system files
+*.log
+.DS_Store
