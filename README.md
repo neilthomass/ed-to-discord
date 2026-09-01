@@ -21,42 +21,21 @@ It never sends private threads. Student posts are ignored unless the thread is a
 
 The first run saves the newest thread in each selected course without posting anything. After that, new matching threads are sent in order. A SHA-256 cursor for each course is stored in Workers KV so the same posts are not sent every five minutes.
 
-## Create a Discord webhook
+## Setup
 
-1. Open the Discord channel settings
-2. Go to **Integrations → Webhooks**
-3. Create a webhook and copy its URL
+1. Open your Discord channel settings, go to **Integrations → Webhooks**, create a webhook, and copy its URL.
+2. Open [Ed API Token Settings](https://edstem.org/us/settings/api-tokens), create a token, and copy it.
+3. Clone the repository and run the setup script:
 
-Keep the URL private. Anyone with it can post to that channel
+   ```sh
+   git clone https://github.com/neilthomass/ed-to-discord.git
+   cd ed-to-discord
+   ./setup.sh
+   ```
 
-## Create an Ed API token
+The setup script asks for the Ed token and Discord webhook, loads your available courses, and shows a checkbox-style course list. It runs the tests, signs in to Cloudflare if needed, creates the KV namespace, and deploys the Worker.
 
-1. Open [Ed API Token Settings](https://edstem.org/us/settings/api-tokens)
-2. Create a token and copy it
-3. Keep it private, just like the Discord webhook URL
-
-## Deploy
-
-Clone the repository and run the setup script:
-
-```sh
-git clone https://github.com/neilthomass/ed-to-discord.git
-cd ed-to-discord
-./setup.sh
-```
-
-The script will:
-
-1. Ask for your Ed token and Discord webhook if they are not already in `.env`.
-2. Load the courses available to your Ed account.
-3. Show a checkbox-style list of courses.
-4. Let you toggle courses by entering numbers such as `1,3`.
-5. Use Enter to confirm your selection.
-6. Run the tests.
-7. Sign in to Cloudflare if needed.
-8. Create the KV namespace and deploy the Worker.
-
-The Worker runs every five minutes after deployment. The first scheduled run only initializes its cursors, so it will not dump old posts into Discord.
+After deployment, the Worker runs every five minutes. Its first run only initializes the cursors, so it does not post old threads.
 
 ## Acknowledgements
 
