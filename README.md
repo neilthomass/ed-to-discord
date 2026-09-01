@@ -6,9 +6,11 @@ EdToDiscord checks Ed every five minutes and sends useful announcements to Disco
 
 It runs as a Cloudflare Worker, so there is no server or Docker container to keep running.
 
-![EdToDiscord desktop notification](docs/desktop-notification.png)
+For a normal personal setup, it is free to run. Polling every five minutes is only 288 Worker runs per day, well below Cloudflare's [Workers free limit](https://developers.cloudflare.com/workers/platform/limits/), and the small cursor cache fits within the [Workers KV free limits](https://developers.cloudflare.com/kv/platform/limits/).
 
-![EdToDiscord message in Discord](docs/discord-message.png)
+<img src="docs/desktop-notification.webp" alt="EdToDiscord desktop notification" width="720">
+
+<img src="docs/discord-message.webp" alt="EdToDiscord message in Discord" width="620">
 
 ## What gets posted
 
