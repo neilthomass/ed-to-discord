@@ -87,9 +87,11 @@ select_courses() {
   done
 
   selected_course_ids=()
+  selected_course_labels=()
   for ((index = 0; index < ${#course_ids[@]}; index += 1)); do
     if [ "${selected_courses[index]}" -eq 1 ]; then
       selected_course_ids+=("${course_ids[index]}")
+      selected_course_labels+=("${course_labels[index]}")
     fi
   done
 }
@@ -170,30 +172,75 @@ while IFS=$'\t' read -r course_id course_label; do
 done <<< "$course_lines"
 unset course_lines course_id course_label
 
-personal_webhook="$(read_env_value DISCORD_WEBHOOK_URL)"
-if [ -n "$personal_webhook" ]; then
-  echo "Using the Discord webhook from the git-ignored .env file."
-else
-  printf "Discord webhook URL (input hidden): "
-  IFS= read -r -s personal_webhook
-  printf "\n"
-fi
+select_courses
 
-if [[ ! "$personal_webhook" =~ ^https:// ]]; then
-  echo "The Discord webhook must be an HTTPS URL." >&2
+configured_webhooks="$(read_env_value DISCORD_WEBHOOKS)"
+legacy_webhook="$(read_env_value DISCORD_WEBHOOK_URL)"
+discord_webhooks="{}"
+
+if [ -n "$configured_webhooks" ] && ! printf '%s' "$configured_webhooks" | node -e '
+  const fs = require("fs");
+  try {
+    const value = JSON.parse(fs.readFileSync(0, "utf8"));
+    if (!value || Array.isArray(value) || typeof value !== "object") process.exit(1);
+  } catch {
+    process.exit(1);
+  }
+'; then
+  echo "DISCORD_WEBHOOKS in .env must be a JSON object mapping course IDs to webhook URLs." >&2
   exit 1
 fi
 
-select_courses
+echo
+echo "Each selected course needs a webhook from its own Discord channel."
+for ((index = 0; index < ${#selected_course_ids[@]}; index += 1)); do
+  course_id="${selected_course_ids[index]}"
+  course_label="${selected_course_labels[index]}"
+  course_webhook=""
 
-selected_csv="$(IFS=,; echo "${selected_course_ids[*]}")"
-discord_webhooks="$(printf '%s\0%s' "$personal_webhook" "$selected_csv" | node -e '
-  const fs = require("fs");
-  const [webhook, csv] = fs.readFileSync(0, "utf8").split("\0");
-  const ids = csv.split(",").filter(Boolean);
-  process.stdout.write(JSON.stringify(Object.fromEntries(ids.map((id) => [id, webhook]))));
-')"
-unset personal_webhook selected_csv selected_courses selected_course_ids course_ids course_labels
+  if [ -n "$configured_webhooks" ]; then
+    course_webhook="$(printf '%s\0%s' "$configured_webhooks" "$course_id" | node -e '
+      const fs = require("fs");
+      const [json, id] = fs.readFileSync(0, "utf8").split("\0");
+      const value = JSON.parse(json)[id];
+      if (typeof value === "string") process.stdout.write(value);
+    ')"
+  elif [ "${#selected_course_ids[@]}" -eq 1 ] && [ -n "$legacy_webhook" ]; then
+    course_webhook="$legacy_webhook"
+  fi
+
+  if [ -n "$course_webhook" ]; then
+    echo "Using the saved Discord webhook for $course_label."
+  else
+    printf "Discord webhook for %s (input hidden): " "$course_label"
+    IFS= read -r -s course_webhook
+    printf "\n"
+  fi
+
+  if ! printf '%s' "$course_webhook" | node -e '
+    const fs = require("fs");
+    try {
+      const url = new URL(fs.readFileSync(0, "utf8"));
+      if (url.protocol !== "https:" || !["discord.com", "discordapp.com"].includes(url.hostname)) process.exit(1);
+    } catch {
+      process.exit(1);
+    }
+  '; then
+    echo "The webhook for $course_label must be a valid HTTPS Discord webhook URL." >&2
+    exit 1
+  fi
+
+  discord_webhooks="$(printf '%s\0%s\0%s' "$discord_webhooks" "$course_id" "$course_webhook" | node -e '
+    const fs = require("fs");
+    const [json, id, webhook] = fs.readFileSync(0, "utf8").split("\0");
+    const value = JSON.parse(json);
+    value[id] = webhook;
+    process.stdout.write(JSON.stringify(value));
+  ')"
+done
+
+unset configured_webhooks legacy_webhook course_webhook course_id course_label index
+unset selected_courses selected_course_ids selected_course_labels course_ids course_labels
 
 secret_file="$(mktemp "${TMPDIR:-/tmp}/ed-to-discord-secrets.XXXXXX")"
 chmod 600 "$secret_file"

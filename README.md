@@ -10,9 +10,9 @@ For a normal personal setup, it is free to run. Polling every five minutes is on
 
 ## Preview
 
-<img src="docs/desktop-notification.webp" alt="EdToDiscord desktop notification" width="720">
+<img src="docs/desktop-notification.webp" alt="Separate Discord channels for each Ed course" width="382">
 
-<img src="docs/discord-message.webp" alt="EdToDiscord message in Discord" width="620">
+<img src="docs/discord-message.webp" alt="An Ed course post delivered to its Discord channel" width="720">
 
 ## What gets posted
 
@@ -27,7 +27,7 @@ The first run saves the newest thread in each selected course without posting an
 
 ## Setup
 
-1. Open your Discord channel settings, go to **Integrations → Webhooks**, create a webhook, and copy its URL.
+1. Create one Discord channel for each Ed course you want to follow. In each channel, open **Edit Channel → Integrations → Webhooks**, create a webhook, and copy its URL.
 2. Open [Ed API Token Settings](https://edstem.org/us/settings/api-tokens), create a token, and copy it.
 3. Clone the repository and run the setup script:
 
@@ -37,7 +37,13 @@ The first run saves the newest thread in each selected course without posting an
    ./setup.sh
    ```
 
-The setup script asks for the Ed token and Discord webhook, loads your available courses, and shows a checkbox-style course list. It runs the tests, signs in to Cloudflare if needed, creates the KV namespace, and deploys the Worker.
+The setup script asks for the Ed token, loads your available courses, and shows a checkbox-style course list. After you choose the courses, it asks for each course's Discord webhook. Each course is therefore delivered only to its corresponding channel. It then runs the tests, signs in to Cloudflare if needed, creates the KV namespace, and deploys the Worker.
+
+For repeat deployments, you can put the mapping in the git-ignored `.env` file and setup will reuse it:
+
+```dotenv
+DISCORD_WEBHOOKS='{"12345":"https://discord.com/api/webhooks/...","67890":"https://discord.com/api/webhooks/..."}'
+```
 
 After deployment, the Worker runs every five minutes. Its first run only initializes the cursors, so it does not post old threads.
 

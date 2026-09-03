@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDiscordPayload, pollCourse, shouldForward, threadHash } from "../src/worker.js";
+import { buildDiscordPayload, poll, pollCourse, shouldForward, threadHash } from "../src/worker.js";
 
 test("thread hash is stable and scoped to its course", async () => {
   assert.equal(await threadHash(123, 456), await threadHash(123, 456));
@@ -105,6 +105,58 @@ test("multiple staff announcements between polls post oldest first", async () =>
   assert.deepEqual(result, { courseId: 10, seen: 2, posted: 2 });
 });
 
+test("each course posts only to its configured Discord channel", async () => {
+  const deliveries = [];
+  const env = {
+    ED_API_TOKEN: "token",
+    DISCORD_WEBHOOKS: JSON.stringify({
+      10: "https://discord.com/api/webhooks/course-10",
+      20: "https://discord.com/api/webhooks/course-20",
+    }),
+    LAST_SEEN: {
+      get: async (key) => ({
+        hash: await threadHash(Number(key.split(":")[1]), 1),
+        threadNumber: 1,
+      }),
+      put: async () => {},
+    },
+  };
+  const fetcher = async (url, options = {}) => {
+    if (url.endsWith("/api/user")) {
+      return jsonResponse({ courses: [{ id: 10, code: "CS10" }, { id: 20, code: "CS20" }] });
+    }
+    const courseMatch = url.match(/\/api\/courses\/(\d+)\/threads/);
+    if (courseMatch) {
+      const courseId = Number(courseMatch[1]);
+      return jsonResponse({ threads: [
+        { id: courseId + 1, number: 2, is_private: false },
+        { id: 1, number: 1, is_private: false },
+      ] });
+    }
+    const threadMatch = url.match(/\/api\/threads\/(\d+)$/);
+    if (threadMatch) {
+      const threadId = Number(threadMatch[1]);
+      const courseId = threadId - 1;
+      return detailResponse(threadId, "announcement", "staff", "2026-01-01T00:00:00Z", courseId);
+    }
+    if (options.method === "POST") {
+      deliveries.push({ url, payload: JSON.parse(options.body) });
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  await poll(env, fetcher);
+
+  assert.deepEqual(
+    deliveries.map(({ url, payload }) => [url, payload.embeds[0].author.name]),
+    [
+      ["https://discord.com/api/webhooks/course-10", "CS10 • General"],
+      ["https://discord.com/api/webhooks/course-20", "CS20 • General"],
+    ],
+  );
+});
+
 test("private threads are never fetched or posted", async () => {
   const writes = [];
   const env = {
@@ -177,12 +229,12 @@ function jsonResponse(value) {
   });
 }
 
-function detailResponse(id, type, courseRole, createdAt = "2026-01-01T00:00:00Z") {
+function detailResponse(id, type, courseRole, createdAt = "2026-01-01T00:00:00Z", courseId = 10) {
   return jsonResponse({
     thread: {
       id,
       user_id: 7,
-      course_id: 10,
+      course_id: courseId,
       number: id,
       title: `Thread ${id}`,
       document: "Body",
