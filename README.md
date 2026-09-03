@@ -10,9 +10,9 @@ For a normal personal setup, it is free to run. Polling every five minutes is on
 
 ## Preview
 
-<img src="docs/desktop-notification.webp" alt="Separate Discord channels for each Ed course" width="382">
+<img src="docs/desktop-notification.webp" alt="Separate Discord channels for each Ed course" width="300">
 
-<img src="docs/discord-message.webp" alt="An Ed course post delivered to its Discord channel" width="720">
+<img src="docs/discord-message.webp" alt="An Ed course post delivered to its Discord channel" width="620">
 
 ## What gets posted
 
